@@ -1,17 +1,17 @@
+pub mod platform;
+pub mod token;
+
+use self::platform::{Exchange, Kyber, Platform, Uniswap};
 use serde::{Deserialize, Serialize};
+use web3::transports::WebSocket;
 
 use std::fs;
 
 use web3::contract::Contract;
+use web3::futures::{future, StreamExt};
 use web3::types::Address;
-use web3::{Transport, Web3};
+use web3::Web3;
 
-pub mod platform;
-pub mod token;
-
-use self::platform::kyber::Kyber;
-use self::platform::uniswap::Uniswap;
-use self::platform::DecentralizedExchange;
 use self::token::Erc20Token;
 
 #[derive(Serialize, Deserialize)]
@@ -26,18 +26,19 @@ struct Config {
     tokens: Vec<Web3Descriptor>,
 }
 
-pub struct Bot<D: DecentralizedExchange, T: Transport> {
-    platforms: Vec<D>,
-    tokens: Vec<Erc20Token<T>>,
+pub struct Bot {
+    web3: web3::Web3<WebSocket>,
+    platforms: Vec<Platform>,
+    tokens: Vec<Erc20Token<WebSocket>>,
 }
 
-impl<D: DecentralizedExchange, T: Transport> Bot<D, T> {
-    pub fn new(web3: Web3<T>, config_file: &str, abi_folder: &str) -> Self {
+impl Bot {
+    pub fn new(web3: Web3<WebSocket>, config_file: &str, abi_folder: &str) -> Self {
         let config_data = fs::read_to_string(config_file).expect("Unable to read config file");
         let config: Config = serde_json::from_str(&config_data).unwrap();
 
-        let platforms: Vec<D> = Vec::new();
-        let tokens: Vec<Erc20Token<T>> = Vec::new();
+        let platforms: Vec<Platform> = Vec::new();
+        let tokens: Vec<Erc20Token<WebSocket>> = Vec::new();
 
         for platform in config.platforms {
             let separator = if abi_folder.ends_with("/") { "" } else { "/" };
@@ -49,14 +50,23 @@ impl<D: DecentralizedExchange, T: Transport> Bot<D, T> {
 
             let contract = Contract::from_json(web3.eth(), platform_addr, abi_bytes_array).unwrap();
 
-            let dex_platform: Option<dyn DecentralizedExchange> = match platform.name.as_str() {
-                "kyber" => Some(Kyber::new(contract)),
-                "uniswap" => Some(Uniswap::new(contract)),
+            let dex_platform: Option<Box<dyn Exchange>> = match platform.name.as_str() {
+                "kyber" => {
+                    let kyber = Kyber;
+                    let dex: Box<dyn Exchange> = Box::new(kyber);
+                    Some(dex)
+                }
+                "uniswap" => {
+                    let uniswap = Uniswap;
+                    let dex: Box<dyn Exchange> = Box::new(uniswap);
+                    Some(dex)
+                }
                 _ => None,
             };
 
-            if let Some(dex) = dex_platform {
-                platforms.append(dex);
+            if let Some(exchange) = dex_platform {
+                let platform = Platform { contract, exchange };
+                platforms.push(platform);
             }
         }
 
@@ -74,9 +84,29 @@ impl<D: DecentralizedExchange, T: Transport> Bot<D, T> {
                 name: token.name,
                 contract,
             };
-            tokens.append(erc20);
+            tokens.push(erc20);
         }
 
-        Bot { platforms, tokens }
+        Bot {
+            web3,
+            platforms,
+            tokens,
+        }
+    }
+
+    async fn start(&self) -> web3::Result {
+        let mut sub = self.web3.eth_subscribe().subscribe_new_heads().await?;
+
+        (&mut sub)
+            .take(5)
+            .for_each(|x| {
+                println!("Got: {:?}", x);
+                future::ready(())
+            })
+            .await;
+
+        sub.unsubscribe().await?;
+
+        Ok(())
     }
 }
