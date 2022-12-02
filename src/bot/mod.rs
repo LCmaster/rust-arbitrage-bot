@@ -36,7 +36,7 @@ struct Config {
 pub struct Bot {
     web3: web3::Web3<WebSocket>,
     platforms: Vec<Platform>,
-    tokens: Vec<Erc20Token<WebSocket>>,
+    tokens: Vec<Erc20Token>,
 }
 
 impl Bot {
@@ -45,7 +45,7 @@ impl Bot {
         let config: Config = serde_json::from_str(&config_data).unwrap();
 
         let mut platforms: Vec<Platform> = Vec::new();
-        let mut tokens: Vec<Erc20Token<WebSocket>> = Vec::new();
+        let mut tokens: Vec<Erc20Token> = Vec::new();
 
         for platform in config.platforms {
             let separator = if abi_folder.ends_with("/") { "" } else { "/" };
@@ -78,20 +78,10 @@ impl Bot {
         }
 
         for token in config.tokens {
-            let separator = if abi_folder.ends_with("/") { "" } else { "/" };
-            let abi_filepath = format!("{}{}erc20.json", abi_folder, separator);
-            let abi_bytes_vector = fs::read(abi_filepath).unwrap();
-            let abi_bytes_array: &[u8] = &abi_bytes_vector;
-
-            let token_addr: Address = token.address.as_str().parse().unwrap();
-
-            let contract = Contract::from_json(web3.eth(), token_addr, abi_bytes_array).unwrap();
-
-            let erc20 = Erc20Token {
-                name: token.name,
-                contract,
-            };
-            tokens.push(erc20);
+            tokens.push(Erc20Token::new(
+                token.name,
+                token.address.as_str().parse().unwrap(),
+            ));
         }
 
         Bot {
@@ -108,16 +98,16 @@ impl Bot {
             for platform in &self.platforms {
                 let tx1 = async {
                     platform.exchange.get_price_rate(
-                        self.tokens[0].contract.address(),
-                        self.tokens[1].contract.address(),
+                        self.tokens[0].address,
+                        self.tokens[1].address,
                         U256::exp10(18) * 100,
                     )
                 };
 
                 let tx2 = async {
                     platform.exchange.get_price_rate(
-                        self.tokens[1].contract.address(),
-                        self.tokens[0].contract.address(),
+                        self.tokens[1].address,
+                        self.tokens[0].address,
                         U256::exp10(18) * 1288,
                     )
                 };
