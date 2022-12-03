@@ -23,8 +23,8 @@ impl Exchange for Kyber {
     }
 }
 
-pub struct Uniswap;
-impl Exchange for Uniswap {
+pub struct UniswapV2;
+impl Exchange for UniswapV2 {
     fn get_price_rate(
         &self,
         token1: Address,

@@ -11,3 +11,10 @@ impl Erc20Token {
         Self { name, address }
     }
 }
+
+struct TokenPair(Erc20Token, Erc20Token);
+impl TokenPair {
+    pub fn new(base: Erc20Token, quote: Erc20Token) -> Self {
+        Self(base, quote)
+    }
+}

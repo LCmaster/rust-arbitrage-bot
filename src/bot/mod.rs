@@ -1,7 +1,7 @@
 pub mod platform;
 pub mod token;
 
-use self::platform::{Exchange, Kyber, Platform, Uniswap};
+use self::platform::{Exchange, Kyber, Platform, UniswapV2};
 use serde::{Deserialize, Serialize};
 use web3::transports::WebSocket;
 
@@ -27,6 +27,7 @@ struct Web3Descriptor {
     address: String,
 }
 
+//TODO: Implement Token Pairs
 #[derive(Serialize, Deserialize)]
 struct Config {
     platforms: Vec<Web3Descriptor>,
@@ -63,8 +64,8 @@ impl Bot {
                     let dex: Box<dyn Exchange> = Box::new(kyber);
                     Some(dex)
                 }
-                "uniswap" => {
-                    let uniswap = Uniswap;
+                "uniswap_v2" => {
+                    let uniswap = UniswapV2;
                     let dex: Box<dyn Exchange> = Box::new(uniswap);
                     Some(dex)
                 }
@@ -92,43 +93,58 @@ impl Bot {
     }
 
     pub async fn start(&self) -> web3::Result {
+        use std::sync::atomic::{AtomicBool, Ordering};
+        use std::sync::Arc;
+
+        let running = Arc::new(AtomicBool::new(true));
+        let r = running.clone();
+
         let mut sub = self.web3.eth_subscribe().subscribe_new_heads().await?;
 
-        while let Some(_) = (&mut sub).take(5).next().await {
-            for platform in &self.platforms {
-                let tx1 = async {
-                    platform.exchange.get_price_rate(
-                        self.tokens[0].address,
-                        self.tokens[1].address,
-                        U256::exp10(18) * 100,
-                    )
-                };
+        ctrlc::set_handler(move || {
+            r.store(false, Ordering::SeqCst);
+        })
+        .expect("Error setting Ctrl-C handler");
 
-                let tx2 = async {
-                    platform.exchange.get_price_rate(
-                        self.tokens[1].address,
-                        self.tokens[0].address,
-                        U256::exp10(18) * 1288,
-                    )
-                };
+        println!("Starting...");
 
-                if let (Ok((expected_rate1, _)), Ok((expected_rate2, _))) = join!(tx1, tx2) {
-                    let buy_rate = 1.0 / wei_to_eth(expected_rate2);
-                    let sell_rate = wei_to_eth(expected_rate1);
+        while running.load(Ordering::SeqCst) {
+            if let Some(_) = (&mut sub).next().await {
+                for platform in &self.platforms {
+                    let tx1 = async {
+                        platform.exchange.get_price_rate(
+                            self.tokens[0].address,
+                            self.tokens[1].address,
+                            U256::exp10(18) * 100,
+                        )
+                    };
 
-                    println!(
-                        "{} {}/{}",
-                        platform.name,
-                        &self.tokens[0].name.to_uppercase(),
-                        &self.tokens[1].name.to_uppercase()
-                    );
-                    println!("Buy: {}; Sell: {}", buy_rate, sell_rate);
+                    let tx2 = async {
+                        platform.exchange.get_price_rate(
+                            self.tokens[1].address,
+                            self.tokens[0].address,
+                            U256::exp10(18) * 1288,
+                        )
+                    };
+
+                    if let (Ok((expected_rate1, _)), Ok((expected_rate2, _))) = join!(tx1, tx2) {
+                        let buy_rate = 1.0 / wei_to_eth(expected_rate2);
+                        let sell_rate = wei_to_eth(expected_rate1);
+
+                        println!(
+                            "{} {}/{}",
+                            platform.name,
+                            &self.tokens[0].name.to_uppercase(),
+                            &self.tokens[1].name.to_uppercase()
+                        );
+                        println!("Buy: {}; Sell: {}", buy_rate, sell_rate);
+                    }
                 }
             }
         }
+        println!("Stopping...");
 
         sub.unsubscribe().await?;
-
         Ok(())
     }
 }

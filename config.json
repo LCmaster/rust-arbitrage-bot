@@ -3,6 +3,10 @@
     {
       "name": "kyber",
       "address": "818E6FECD516Ecc3849DAf6845e3EC868087B755"
+    },
+    {
+      "name": "uniswap_v2",
+      "address": "0x5C69bEe701ef814a2B6a3EDD4B1652CB9cc5aA6f"
     }
   ],
   "tokens": [
