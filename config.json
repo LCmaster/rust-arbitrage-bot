@@ -2,7 +2,8 @@
   "platforms": [
     {
       "name": "kyber",
-      "address": "818E6FECD516Ecc3849DAf6845e3EC868087B755"
+      "address": "818E6FECD516Ecc3849DAf6845e3EC868087B755",
+      "pairs": ["ETH/DAI", "DAI/USDC", "ETH/USDC"]
     },
     {
       "name": "uniswap_v2",
@@ -10,9 +11,9 @@
     }
   ],
   "tokens": [
-    { "name": "eth", "address": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee" },
-    { "name": "dai", "address": "6B175474E89094C44Da98b954EedeAC495271d0F" },
-    { "name": "usdc", "address": "a0b86991c6218b36c1d19d4a2e9eb0ce3606eb48" },
-    { "name": "weth", "address": "C02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2" }
+    { "name": "ETH", "address": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee" },
+    { "name": "DAI", "address": "6B175474E89094C44Da98b954EedeAC495271d0F" },
+    { "name": "USDC", "address": "a0b86991c6218b36c1d19d4a2e9eb0ce3606eb48" },
+    { "name": "WETH", "address": "C02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2" }
   ]
 }

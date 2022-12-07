@@ -1,7 +1,6 @@
 use std::env;
 
-pub mod bot;
-use crate::bot::Bot;
+use lib::bot::Bot;
 
 #[tokio::main]
 async fn main() -> web3::Result<()> {
